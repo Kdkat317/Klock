@@ -25,6 +25,12 @@ jobs:
           mkdir -p android-project/app/src/main/res/xml
           mkdir -p android-project/app/src/main/assets
 
+          if [ -f "index.html" ]; then
+            cp index.html android-project/app/src/main/assets/index.html
+          else
+            echo "<!DOCTYPE html><html><body><h1>Klock</h1></body></html>" > android-project/app/src/main/assets/index.html
+          fi
+
           cat << 'EOF' > android-project/settings.gradle.kts
           pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
           dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
@@ -88,80 +94,3 @@ jobs:
                       <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
                       <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_large" />
                   </receiver>
-              </application>
-          </manifest>
-          EOF
-
-          cat << 'EOF' > android-project/app/src/main/java/com/klock/vedic/MainActivity.kt
-          package com.klock.vedic
-          import android.annotation.SuppressLint
-          import android.os.Bundle
-          import android.webkit.WebChromeClient
-          import android.webkit.WebView
-          import android.webkit.WebViewClient
-          import androidx.appcompat.app.AppCompatActivity
-          class MainActivity : AppCompatActivity() {
-              private lateinit var webView: WebView
-              @SuppressLint("SetJavaScriptEnabled")
-              override fun onCreate(savedInstanceState: Bundle?) {
-                  super.onCreate(savedInstanceState)
-                  webView = WebView(this)
-                  setContentView(webView)
-                  webView.settings.apply { javaScriptEnabled = true; domStorageEnabled = true; allowFileAccess = true }
-                  webView.webViewClient = WebViewClient()
-                  webView.webChromeClient = WebChromeClient()
-                  webView.addJavascriptInterface(WebViewWidgetBridge(this), "AndroidWidgetBridge")
-                  webView.loadUrl("file:///android_asset/index.html")
-              }
-              override fun onPause() { super.onPause(); KlockWidgetUpdater.updateAllWidgets(this) }
-          }
-          EOF
-
-          cat << 'EOF' > android-project/app/src/main/java/com/klock/vedic/VedicTimeCalculator.kt
-          package com.klock.vedic
-          import android.appwidget.AppWidgetManager
-          import android.content.ComponentName
-          import android.content.Context
-          import android.os.Build
-          import android.webkit.JavascriptInterface
-          import org.json.JSONObject
-          import java.util.Calendar
-          data class VedicSnapshot(val ghati: Int, val pala: Int, val vipala: Int, val muhurta: Int, val progressPercent: Int, val civilTimeFormatted: String, val anchorLabel: String)
-          object VedicTimeCalculator {
-              private const val PREFS_NAME = "klock_native_prefs"
-              private const val KEY_STATE_JSON = "state_json"
-              fun saveConfigJson(context: Context, json: String) { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_STATE_JSON, json).apply(); KlockWidgetUpdater.updateAllWidgets(context) }
-              fun computeNow(context: Context): VedicSnapshot {
-                  val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                  val rawJson = prefs.getString(KEY_STATE_JSON, "{}") ?: "{}"
-                  val config = try { JSONObject(rawJson) } catch (_: Exception) { JSONObject() }
-                  val anchorMode = config.optString("anchorMode", "civil")
-                  val manualSunrise = config.optString("manualSunrise", "")
-                  val cal = Calendar.getInstance()
-                  val hour = cal.get(Calendar.HOUR_OF_DAY)
-                  val minute = cal.get(Calendar.MINUTE)
-                  val second = cal.get(Calendar.SECOND)
-                  val millis = cal.get(Calendar.MILLISECOND)
-                  val civilElapsedMs = hour * 3600000L + minute * 60000L + second * 1000L + millis
-                  var anchorOffsetMs = 0L; var anchorLabel = "Civil Anchor"
-                  if (anchorMode == "sunrise") {
-                      anchorOffsetMs = if (manualSunrise.matches(Regex("\\d{2}:\\d{2}"))) { val parts = manualSunrise.split(":"); (parts[0].toLong() * 3600L + parts[1].toLong() * 60L) * 1000L } else { 6L * 3600000L }
-                      anchorLabel = "Sunrise Anchor"
-                  }
-                  val elapsed = ((civilElapsedMs - anchorOffsetMs) % 86400000L + 86400000L) % 86400000L
-                  val ghati = (elapsed / 1440000L).toInt()
-                  val remGhati = elapsed % 1440000L
-                  val pala = (remGhati / 24000L).toInt()
-                  val vipala = ((remGhati % 24000L) / 400L).toInt()
-                  val muhurta = (elapsed / 2880000L).toInt() + 1
-                  val pct = ((elapsed * 100L) / 86400000L).toInt()
-                  return VedicSnapshot(ghati, pala, vipala, muhurta, pct, String.format("%02d:%02d", hour, minute), anchorLabel)
-              }
-          }
-          class WebViewWidgetBridge(private val context: Context) {
-              @JavascriptInterface fun syncConfiguration(json: String) { VedicTimeCalculator.saveConfigJson(context, json) }
-              @JavascriptInterface fun requestPinWidget(variant: String) {
-                  if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                      val mgr = context.getSystemService(AppWidgetManager::class.java)
-                      if (mgr != null && mgr.isRequestPinAppWidgetSupported) {
-                          val provider = ComponentName(context, when(variant.lowercase()) { "compact" -> CompactKlockWidget::class.java; "large" -> LargeKlockWidget

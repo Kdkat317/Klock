@@ -25,27 +25,13 @@ jobs:
           mkdir -p android-project/app/src/main/res/xml
           mkdir -p android-project/app/src/main/assets
 
-          # 1. settings.gradle.kts
           cat << 'EOF' > android-project/settings.gradle.kts
-          pluginManagement {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  google()
-                  mavenCentral()
-              }
-          }
+          pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
+          dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS); repositories { google(); mavenCentral() } }
           rootProject.name = "KlockVedic"
           include(":app")
           EOF
 
-          # 2. root build.gradle.kts
           cat << 'EOF' > android-project/build.gradle.kts
           plugins {
               id("com.android.application") version "8.3.2" apply false
@@ -53,7 +39,6 @@ jobs:
           }
           EOF
 
-          # 3. app build.gradle.kts
           cat << 'EOF' > android-project/app/build.gradle.kts
           plugins {
               id("com.android.application")
@@ -69,13 +54,8 @@ jobs:
                   versionCode = 1
                   versionName = "1.0.0"
               }
-              buildTypes {
-                  release { isMinifyEnabled = false }
-              }
-              compileOptions {
-                  sourceCompatibility = JavaVersion.VERSION_17
-                  targetCompatibility = JavaVersion.VERSION_17
-              }
+              buildTypes { release { isMinifyEnabled = false } }
+              compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
               kotlinOptions { jvmTarget = "17" }
           }
           dependencies {
@@ -84,31 +64,20 @@ jobs:
           }
           EOF
 
-          # 4. AndroidManifest.xml
           cat << 'EOF' > android-project/app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
               <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-              <application
-                  android:allowBackup="true"
-                  android:label="Klock"
-                  android:supportsRtl="true"
-                  android:theme="@style/Theme.AppCompat.NoActionBar">
-                  <activity
-                      android:name=".MainActivity"
-                      android:exported="true"
-                      android:configChanges="orientation|screenSize|keyboardHidden">
+              <application android:allowBackup="true" android:label="Klock" android:supportsRtl="true" android:theme="@style/Theme.AppCompat.NoActionBar">
+                  <activity android:name=".MainActivity" android:exported="true" android:configChanges="orientation|screenSize|keyboardHidden">
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN" />
                           <category android:name="android.intent.category.LAUNCHER" />
                       </intent-filter>
                   </activity>
                   <receiver android:name=".CompactKlockWidget" android:exported="true" android:label="Klock Compact (2x1)">
-                      <intent-filter>
-                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                          <action android:name="com.klock.vedic.ACTION_WIDGET_TICK" />
-                      </intent-filter>
+                      <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
                       <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info_compact" />
                   </receiver>
                   <receiver android:name=".MediumKlockWidget" android:exported="true" android:label="Klock Medium (4x2)">
@@ -123,7 +92,6 @@ jobs:
           </manifest>
           EOF
 
-          # 5. MainActivity.kt
           cat << 'EOF' > android-project/app/src/main/java/com/klock/vedic/MainActivity.kt
           package com.klock.vedic
           import android.annotation.SuppressLint
@@ -139,24 +107,16 @@ jobs:
                   super.onCreate(savedInstanceState)
                   webView = WebView(this)
                   setContentView(webView)
-                  webView.settings.apply {
-                      javaScriptEnabled = true
-                      domStorageEnabled = true
-                      allowFileAccess = true
-                  }
+                  webView.settings.apply { javaScriptEnabled = true; domStorageEnabled = true; allowFileAccess = true }
                   webView.webViewClient = WebViewClient()
                   webView.webChromeClient = WebChromeClient()
                   webView.addJavascriptInterface(WebViewWidgetBridge(this), "AndroidWidgetBridge")
                   webView.loadUrl("file:///android_asset/index.html")
               }
-              override fun onPause() {
-                  super.onPause()
-                  KlockWidgetUpdater.updateAllWidgets(this)
-              }
+              override fun onPause() { super.onPause(); KlockWidgetUpdater.updateAllWidgets(this) }
           }
           EOF
 
-          # 6. VedicTimeCalculator.kt
           cat << 'EOF' > android-project/app/src/main/java/com/klock/vedic/VedicTimeCalculator.kt
           package com.klock.vedic
           import android.appwidget.AppWidgetManager
@@ -164,17 +124,13 @@ jobs:
           import android.content.Context
           import android.os.Build
           import android.webkit.JavascriptInterface
-          import android.widget.Toast
           import org.json.JSONObject
           import java.util.Calendar
           data class VedicSnapshot(val ghati: Int, val pala: Int, val vipala: Int, val muhurta: Int, val progressPercent: Int, val civilTimeFormatted: String, val anchorLabel: String)
           object VedicTimeCalculator {
               private const val PREFS_NAME = "klock_native_prefs"
               private const val KEY_STATE_JSON = "state_json"
-              fun saveConfigJson(context: Context, json: String) {
-                  context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_STATE_JSON, json).apply()
-                  KlockWidgetUpdater.updateAllWidgets(context)
-              }
+              fun saveConfigJson(context: Context, json: String) { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_STATE_JSON, json).apply(); KlockWidgetUpdater.updateAllWidgets(context) }
               fun computeNow(context: Context): VedicSnapshot {
                   val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                   val rawJson = prefs.getString(KEY_STATE_JSON, "{}") ?: "{}"
@@ -187,13 +143,9 @@ jobs:
                   val second = cal.get(Calendar.SECOND)
                   val millis = cal.get(Calendar.MILLISECOND)
                   val civilElapsedMs = hour * 3600000L + minute * 60000L + second * 1000L + millis
-                  var anchorOffsetMs = 0L
-                  var anchorLabel = "Civil Anchor"
+                  var anchorOffsetMs = 0L; var anchorLabel = "Civil Anchor"
                   if (anchorMode == "sunrise") {
-                      anchorOffsetMs = if (manualSunrise.matches(Regex("\\d{2}:\\d{2}"))) {
-                          val parts = manualSunrise.split(":")
-                          (parts[0].toLong() * 3600L + parts[1].toLong() * 60L) * 1000L
-                      } else { 6L * 3600000L }
+                      anchorOffsetMs = if (manualSunrise.matches(Regex("\\d{2}:\\d{2}"))) { val parts = manualSunrise.split(":"); (parts[0].toLong() * 3600L + parts[1].toLong() * 60L) * 1000L } else { 6L * 3600000L }
                       anchorLabel = "Sunrise Anchor"
                   }
                   val elapsed = ((civilElapsedMs - anchorOffsetMs) % 86400000L + 86400000L) % 86400000L
@@ -212,101 +164,4 @@ jobs:
                   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                       val mgr = context.getSystemService(AppWidgetManager::class.java)
                       if (mgr != null && mgr.isRequestPinAppWidgetSupported) {
-                          val provider = ComponentName(context, when(variant.lowercase()) { "compact" -> CompactKlockWidget::class.java; "large" -> LargeKlockWidget::class.java; else -> MediumKlockWidget::class.java })
-                          mgr.requestPinAppWidget(provider, null, null)
-                      }
-                  }
-              }
-          }
-          EOF
-
-          # 7. KlockWidgetProviders.kt
-          cat << 'EOF' > android-project/app/src/main/java/com/klock/vedic/KlockWidgetProviders.kt
-          package com.klock.vedic
-          import android.app.AlarmManager
-          import android.app.PendingIntent
-          import android.appwidget.AppWidgetManager
-          import android.appwidget.AppWidgetProvider
-          import android.content.ComponentName
-          import android.content.Context
-          import android.content.Intent
-          import android.widget.RemoteViews
-          object KlockWidgetUpdater {
-              fun updateAllWidgets(context: Context) {
-                  val mgr = AppWidgetManager.getInstance(context)
-                  val snap = VedicTimeCalculator.computeNow(context)
-                  val pendingTap = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-                  
-                  for (id in mgr.getAppWidgetIds(ComponentName(context, CompactKlockWidget::class.java))) {
-                      val rv = RemoteViews(context.packageName, R.layout.widget_klock_compact)
-                      rv.setTextViewText(R.id.tv_vedic_main, String.format("%02d : %02d", snap.ghati, snap.pala))
-                      rv.setOnClickPendingIntent(R.id.widget_root, pendingTap)
-                      mgr.updateAppWidget(id, rv)
-                  }
-                  for (id in mgr.getAppWidgetIds(ComponentName(context, MediumKlockWidget::class.java))) {
-                      val rv = RemoteViews(context.packageName, R.layout.widget_klock_medium)
-                      rv.setTextViewText(R.id.tv_vedic_main, String.format("%02d : %02d", snap.ghati, snap.pala))
-                      rv.setTextViewText(R.id.tv_civil_sub, snap.civilTimeFormatted)
-                      rv.setTextViewText(R.id.tv_muhurta_sub, "Muhūrta ${snap.muhurta}/30")
-                      rv.setOnClickPendingIntent(R.id.widget_root, pendingTap)
-                      mgr.updateAppWidget(id, rv)
-                  }
-                  for (id in mgr.getAppWidgetIds(ComponentName(context, LargeKlockWidget::class.java))) {
-                      val rv = RemoteViews(context.packageName, R.layout.widget_klock_large)
-                      rv.setTextViewText(R.id.tv_vedic_main, String.format("%02d : %02d", snap.ghati, snap.pala))
-                      rv.setTextViewText(R.id.tv_civil_sub, "Local Time: ${snap.civilTimeFormatted} •${snap.anchorLabel}")
-                      rv.setProgressBar(R.id.pb_day_cycle, 100, snap.progressPercent, false)
-                      rv.setTextViewText(R.id.tv_cycle_pct, "${snap.progressPercent}% of 60-Ghaṭī Cycle")
-                      rv.setOnClickPendingIntent(R.id.widget_root, pendingTap)
-                      mgr.updateAppWidget(id, rv)
-                  }
-              }
-          }
-          open class BaseKlockWidget : AppWidgetProvider() {
-              override fun onUpdate(context: Context, mgr: AppWidgetManager, ids: IntArray) { KlockWidgetUpdater.updateAllWidgets(context) }
-          }
-          class CompactKlockWidget : BaseKlockWidget()
-          class MediumKlockWidget : BaseKlockWidget()
-          class LargeKlockWidget : BaseKlockWidget()
-          EOF
-
-          # 8. XML Layouts & Provider Infos
-          cat << 'EOF' > android-project/app/src/main/res/layout/widget_klock_compact.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#000000" android:gravity="center" android:orientation="vertical" android:padding="12dp">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="KLOCK • VEDIC" android:textColor="#FF9500" android:textSize="10sp" android:textStyle="bold" />
-              <TextView android:id="@+id/tv_vedic_main" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="00 : 00" android:textColor="#FFFFFF" android:textSize="28sp" android:textStyle="bold" />
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Ghaṭī : Pala" android:textColor="#9898A2" android:textSize="11sp" />
-          </LinearLayout>
-          EOF
-
-          cat << 'EOF' > android-project/app/src/main/res/layout/widget_klock_medium.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#000000" android:gravity="center_vertical" android:orientation="horizontal" android:padding="16dp">
-              <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                  <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="GHAṬĪ : PALA" android:textColor="#FF9500" android:textSize="11sp" android:textStyle="bold" />
-                  <TextView android:id="@+id/tv_vedic_main" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="00 : 00" android:textColor="#FFFFFF" android:textSize="34sp" android:textStyle="bold" />
-              </LinearLayout>
-              <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:gravity="end" android:orientation="vertical">
-                  <TextView android:id="@+id/tv_civil_sub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="00:00" android:textColor="#FFFFFF" android:textSize="20sp" />
-                  <TextView android:id="@+id/tv_muhurta_sub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Muhūrta 1/30" android:textColor="#FF9500" android:textSize="12sp" />
-              </LinearLayout>
-          </LinearLayout>
-          EOF
-
-          cat << 'EOF' > android-project/app/src/main/res/layout/widget_klock_large.xml
-          <?xml version="1.0" encoding="utf-8"?>
-          <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:id="@+id/widget_root" android:layout_width="match_parent" android:layout_height="match_parent" android:background="#000000" android:orientation="vertical" android:padding="16dp">
-              <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="KLOCK • AHORĀTRA PROGRESS" android:textColor="#FF9500" android:textSize="11sp" android:textStyle="bold" />
-              <TextView android:id="@+id/tv_vedic_main" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="4dp" android:text="00 : 00" android:textColor="#FFFFFF" android:textSize="38sp" android:textStyle="bold" />
-              <TextView android:id="@+id/tv_civil_sub" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Local Time: 00:00" android:textColor="#9898A2" android:textSize="13sp" />
-              <ProgressBar android:id="@+id/pb_day_cycle" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="8dp" android:layout_marginTop="12dp" android:max="100" android:progress="50" android:progressTint="#FF9500" />
-              <TextView android:id="@+id/tv_cycle_pct" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:text="1 Ghaṭī = 24m • 1 Pala = 24s" android:textColor="#9898A2" android:textSize="11sp" />
-          </LinearLayout>
-          EOF
-
-          cat << 'EOF' > android-project/app/src/main/res/xml/widget_info_compact.xml
-          <?xml version="1.0" encoding="utf-8"?>
+                          val provider = ComponentName(context, when(variant.lowercase()) { "compact" -> CompactKlockWidget::class.java; "large" -> LargeKlockWidget
